@@ -1,0 +1,57 @@
+================================================================================
+  KANBAN CRM — GET A LINK SO OTHER PEOPLE CAN USE IT (VERCEL)
+================================================================================
+
+You get a FREE web address like:  https://something.vercel.app
+(Custom domain .com is optional later in Vercel settings.)
+
+--------------------------------------------------------------------------------
+OPTION A — Use GitHub (good if you use GitHub anyway)
+--------------------------------------------------------------------------------
+
+1) Install Git (one-time):  https://git-scm.com/download/win
+   Restart the PC after installing (safest).
+
+2) Double-click (or right-click -> Run with PowerShell):
+      scripts\Push-To-GitHub.ps1
+
+3) Sign in if Windows / Git asks you to.
+
+4) On vercel.com -> Add New Project -> Import your GitHub repo "Kanban-CRM"
+   Add Environment Variables (Production):
+      VITE_SUPABASE_URL          = from Supabase -> Project Settings -> API
+      VITE_SUPABASE_ANON_KEY     = same page (anon public key)
+
+5) Deploy. Share the .vercel.app link.
+
+--------------------------------------------------------------------------------
+OPTION B — No GitHub (deploy from your PC only)
+--------------------------------------------------------------------------------
+
+1) In PowerShell, go to this folder:
+      cd c:\Users\alexa\kanban-crm
+
+2) Run:
+      npm install
+
+3) Double-click:
+      scripts\Deploy-To-Vercel-No-GitHub.ps1
+
+   Follow the prompts; sign in to Vercel when the browser opens.
+
+4) In Vercel -> your project -> Settings -> Environment Variables, add:
+      VITE_SUPABASE_URL
+      VITE_SUPABASE_ANON_KEY
+   Then Redeploy so the app can talk to Supabase.
+
+--------------------------------------------------------------------------------
+Why I can't "just do it" for you from the chat
+--------------------------------------------------------------------------------
+
+Putting code on GitHub or Vercel always needs YOU to sign in once in a
+browser (or paste a token). No one else can do that safely for your account.
+
+The scripts above do all the technical steps; you only install Git (if needed)
+and sign in when asked.
+
+================================================================================
