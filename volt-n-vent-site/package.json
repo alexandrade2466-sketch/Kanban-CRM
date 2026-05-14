@@ -1,0 +1,9 @@
+{
+  "name": "volt-n-vent-site",
+  "private": true,
+  "description": "Volt N' Vent — Las Vegas HVAC & electrical marketing site",
+  "scripts": {
+    "demo": "npx --yes serve . -l 3333",
+    "build": "node -e \"console.log('static html')\""
+  }
+}
