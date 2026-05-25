@@ -2,3 +2,8 @@ node_modules
 .DS_Store
 
 .vercel
+
+# JNB / Volt N' Vent bot secrets (Supabase, n8n, GHL)
+bot-supabase/.env.jnb-voltnvent.local
+bot-supabase/.n8n-credential-ids.json
+bot-supabase/.n8n-workflow-ids.json

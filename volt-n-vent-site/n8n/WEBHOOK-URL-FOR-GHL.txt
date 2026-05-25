@@ -1,0 +1,5 @@
+Paste this URL in GHL → GHL to n8n SMS Bot → webhook step:
+
+https://voltnvent.com/api/ghl-sms-webhook
+
+(Do NOT use the raw n8n HTTP URL — GHL requires HTTPS.)

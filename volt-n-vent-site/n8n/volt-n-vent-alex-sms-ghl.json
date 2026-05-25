@@ -1,0 +1,714 @@
+{
+  "name": "Volt N Vent - Alex SMS Bot (GHL + Supabase)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "volt-n-vent-inbound-sms",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1000001-0001-4000-8000-000000000001",
+      "name": "Webhook GHL SMS",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "volt-n-vent-inbound-sms"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nlet body = raw.body ?? raw.data ?? raw.payload ?? raw;\nif (body?.type === 'InboundMessage' && String(body.messageType || '').toUpperCase().includes('SMS')) {\n  body = {\n    client_slug: 'volt-n-vent',\n    contact_id: body.contactId,\n    message_body: body.body,\n    location_id: body.locationId,\n    conversation_id: body.conversationId,\n    message_type: 'SMS',\n    phone: body.from\n  };\n}\n\nfunction str(v) {\n  if (v == null) return '';\n  return String(v).trim();\n}\nfunction pick(obj, ...keys) {\n  if (!obj || typeof obj !== 'object') return '';\n  for (const k of keys) {\n    const v = obj[k];\n    if (v != null && str(v) !== '' && !str(v).includes('{{')) return str(v);\n  }\n  return '';\n}\n\nconst contactId = pick(body, 'contact_id', 'contactId', 'contactid')\n  || pick(body.contact, 'id', 'contactId', 'contact_id')\n  || pick(body.Contact, 'id', 'contactId');\nconst messageBody = pick(body, 'message_body', 'messageBody', 'body', 'text', 'message', 'sms_body', 'reply')\n  || pick(body.message, 'body', 'text', 'message')\n  || pick(body.Message, 'body', 'text')\n  || pick(body, 'last_message_body', 'lastMessageBody');\nconst locationId = pick(body, 'location_id', 'locationId', 'locationid')\n  || pick(body.location, 'id', 'locationId')\n  || pick(body.Location, 'id');\n\nif (!messageBody) {\n  throw new Error('GHL webhook missing message. Map message_body using { } picker (Message → Body). Raw keys: ' + Object.keys(body || {}).join(', '));\n}\nif (!contactId) {\n  throw new Error('GHL webhook missing contact. Map contact_id using { } picker (Contact → Id). Raw keys: ' + Object.keys(body || {}).join(', '));\n}\n\nreturn [{\n  json: {\n    client_slug: pick(body, 'client_slug') || 'volt-n-vent',\n    location_id: locationId,\n    ghl_contact_id: contactId,\n    ghl_conversation_id: pick(body, 'conversation_id', 'conversationId') || pick(body.conversation, 'id'),\n    message_body: messageBody,\n    message_type: pick(body, 'message_type', 'messageType') || 'SMS',\n    phone: pick(body, 'phone', 'contact_phone', 'phoneNumber') || pick(body.contact, 'phone'),\n    first_name: pick(body, 'first_name', 'firstName') || pick(body.contact, 'firstName', 'first_name'),\n    last_name: pick(body, 'last_name', 'lastName') || pick(body.contact, 'lastName', 'last_name'),\n    channel: 'sms',\n    dedupe_key: pick(body, 'dedupe_key') || `${contactId}:${pick(body, 'message_ts') || ''}:${messageBody.slice(0, 120)}`\n  }\n}];"
+      },
+      "id": "a1000001-0001-4000-8000-000000000002",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://emrqlssbrntnvvdwwojs.supabase.co/rest/v1/bot_client_full",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "slug",
+              "value": "eq.volt-n-vent"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000001-0001-4000-8000-000000000003",
+      "name": "Load Alex Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase Service Role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://emrqlssbrntnvvdwwojs.supabase.co/rest/v1/rpc/alex_sms_start",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_client_slug: $('Normalize Input').first().json.client_slug, p_ghl_contact_id: $('Normalize Input').first().json.ghl_contact_id, p_ghl_conversation_id: $('Normalize Input').first().json.ghl_conversation_id || '', p_dedupe_key: $('Normalize Input').first().json.dedupe_key, p_message_body: $('Normalize Input').first().json.message_body, p_phone: $('Normalize Input').first().json.phone || '', p_first_name: $('Normalize Input').first().json.first_name || '', p_last_name: $('Normalize Input').first().json.last_name || '' }) }}",
+        "options": {}
+      },
+      "id": "a1000001-0001-4000-8000-000000000010",
+      "name": "Start Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        550,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase Service Role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "skip-dup",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000001-0001-4000-8000-000000000011",
+      "name": "Already Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const norm = $('Normalize Input').first().json;\nconst session = $('Start Session').first().json;\nconst rows = $('Load Alex Config').first().json;\nconst config = Array.isArray(rows) ? rows[0] : rows;\nif (!config || !config.is_active) throw new Error('Config missing');\nconst text = (norm.message_body || '').toLowerCase().trim();\nconst stopWords = config.sms_opt_out_keywords || ['stop','unsubscribe','cancel','end','quit'];\nconst escalation = config.escalation_keywords || [];\nconst softNo = ['not interested','no thanks','leave me alone','stop bothering','dont text','don\\'t text'];\nconst leadSourceAsk = /how did you get my (number|info)|where did you get my (number|info)|why are you (texting|contacting) me|never (signed up|contacted you)|didn'?t sign up/.test(text);\nconst reviewConcern = /\\b(google review|yelp|bbb|bad review|leave a review|report you|scam|stop spamming)\\b/.test(text);\nlet route = 'ai';\nlet reply_text = '';\nif (stopWords.some(w => text === w || text.startsWith(w + ' '))) {\n  route = 'stop';\n  reply_text = 'You\\'re all set — you won\\'t get more texts from us. Reply HELP if you need anything.';\n} else if (text === 'help') {\n  route = 'help';\n  reply_text = config.sms_help_reply || 'Volt N Vent: Reply STOP to opt out. Call 702-808-8861.';\n} else if (reviewConcern) {\n  route = 'ai';\n} else if (escalation.some(k => text.includes(String(k).toLowerCase())) && !leadSourceAsk) {\n  route = 'handoff';\n  reply_text = \"Got it — I'll have someone from our team reach out shortly. You can also call us at 702-808-8861.\";\n} else if (softNo.some(p => text.includes(p))) {\n  route = 'ai';\n}\nconst playbook = typeof config.conversation_playbook === 'string' ? JSON.parse(config.conversation_playbook) : (config.conversation_playbook || {});\nreturn [{\n  json: {\n    ...norm,\n    ...session,\n    config,\n    playbook,\n    route,\n    reply_text,\n    lead_source_asked: leadSourceAsk,\n    chat_history: session.history || [],\n    system_prompt: config.system_prompt,\n    model: config.model || 'gpt-4.1-mini',\n    temperature: Number(config.temperature) || 0.55\n  }\n}];"
+      },
+      "id": "a1000001-0001-4000-8000-000000000004",
+      "name": "Guardrails + Route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "help"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "handoff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "handoff"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "ai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ai"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a1000001-0001-4000-8000-000000000005",
+      "name": "Route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json;\nconst session = $('Start Session').first().json;\nconst history = Array.isArray(j.chat_history) ? j.chat_history : [];\nconst priorFromHistory = history.filter(h => h.role === 'assistant').length;\nconst priorAssistant = Math.max(Number(session.prior_assistant_count ?? 0), priorFromHistory);\nconst assistantMsgs = history.filter(h => h.role === 'assistant').map(h => String(h.content || ''));\nconst assistantBlob = assistantMsgs.join(' ').toLowerCase();\nconst threadBlob = history.map(h => String(h.content || '')).join(' ').toLowerCase();\nconst empathyUsed = /sorry to hear|ah man|that's rough|must be frustrating|sorry about that|sorry youre dealing/.test(assistantBlob);\nconst heyUsed = assistantMsgs.some(t => /^hey[,!\\s]/i.test(t.trim()));\nconst userText = String(j.message_body || '').toLowerCase().trim();\n\nconst wellnessContext = /wellness|29\\.95|\\$29|\\$30|checkup|check-up|preventative visit|wellness check/.test(threadBlob);\nconst asksWhyPay = /why (do i|would i|should i) pay|why.*(29|pay|fee|charge)|what am i paying|why that (price|much)|what'?s the catch|why so cheap/.test(userText);\nconst asksWellnessDirect = /what (is|'?s) (a |an |the )?wellness|wellness check|hvac wellness|what do you check|what does the (check|visit)|what happens (on|during)|what'?s included|static pressure|what exactly|explain (the |this |your )?(wellness|check|offer|visit)|tell me (more )?about (the |this )?(wellness|check|offer|visit)/.test(userText);\nconst asksVagueFollowUp = wellnessContext && /what (is|does) (it|that|this)|what'?s that|what do you mean|tell me more|how does (it|that) work|what is that|whats that|what does that mean/.test(userText);\nconst asksComponents = /compressor|refrigerant|coil|condenser|duct|fan motor|lungs|blood pressure|what parts|what components|components do you/.test(userText);\n\nconst wellnessTopic = asksWhyPay\n  ? 'why_pay'\n  : asksComponents && (wellnessContext || asksWellnessDirect)\n    ? 'hvac_components'\n    : asksWellnessDirect || asksVagueFollowUp\n      ? 'what_is_wellness_check'\n      : null;\n\nlet wo = j.config?.wellness_offer;\nif (typeof wo === 'string') { try { wo = JSON.parse(wo); } catch { wo = {}; } }\nwo = wo || {};\nconst ku = wo.knowledge_usage || {};\nconst topic = wellnessTopic && ku.topics ? ku.topics[wellnessTopic] : null;\n\nconst leadNote = j.lead_source_asked\n  ? 'They asked how we got their info — answer briefly per playbook only.'\n  : 'Never mention lead sources or DNC unless they explicitly asked.';\n\nlet phaseNote = priorAssistant === 0\n  ? 'FIRST reply: ultra casual. Sympathy ONCE max if they have a problem. No Hey required. No company intro unless outbound drip context.'\n  : 'ONGOING: no Hey, no intro, no company name. Reply to NEW info only.';\n\nlet antiRepeat = '';\nif (empathyUsed) antiRepeat += 'No more sympathy phrases (sorry to hear / ah man). ';\nif (heyUsed || priorAssistant > 0) antiRepeat += 'Do NOT start with Hey — use Got it / Ok / Yeah / So or jump straight in. ';\nif (priorAssistant > 0) antiRepeat += 'Do NOT re-ask answered questions. Do NOT repeat your last message. ';\nif (/static pressure|blood pressure/.test(assistantBlob) && (asksWellnessDirect || asksVagueFollowUp)) {\n  antiRepeat += 'You already explained static pressure — add a different detail (components, preventative, diagnostic) or keep shorter. ';\n}\n\nlet triageHint = '';\nif (/not cooling|no ac|no heat|won't cool|emergency|asap|103|110 degrees|burning smell|water leak|unit died/.test(userText)) {\n  triageHint = 'TRIAGE: Service/emergency — help with their problem first. Do NOT pitch wellness. ';\n} else if (/maintenance plan|annual service|tune.?up|routine maintenance|service my (ac|unit)|check my (ac|unit)/.test(userText)) {\n  triageHint = 'TRIAGE: Maintenance/service request — book or qualify. Do NOT default to wellness drip script. ';\n} else if (/quote|how much.*(install|replace|new unit)|financing|buy a (new )?system|good better best/.test(userText)) {\n  triageHint = 'TRIAGE: Sales/quote — warm handoff, no job pricing in SMS. ';\n} else if (/not interested|no thanks|stop texting|leave me alone|wrong number|don't text/.test(userText)) {\n  triageHint = 'TRIAGE: Low interest — polite close, no pitch. ';\n} else if (wellnessContext && /^(yes|yeah|yep|ok|okay|sure|interested|book|schedule)\\b/.test(userText)) {\n  triageHint = 'TRIAGE: Wellness campaign interest — book window, one question at a time. ';\n}\n\nlet wellnessHint = '';\nif (wellnessTopic) {\n  wellnessHint = `IMPORTANT: They asked about ${wellnessTopic}. You MUST answer clearly in 1-2 casual sentences — never deflect. `;\n  if (topic && Array.isArray(topic.fragments)) {\n    wellnessHint += `Use 1-2 of these ideas (paraphrase, do NOT dump all): ${topic.fragments.slice(0, 6).join(' | ')}\\\\n`;\n  }\n}\n\nconst preamble = `SMS rules (highest priority):\\\\n- ${phaseNote}\\\\n- ${triageHint}${antiRepeat}${wellnessHint}${leadNote}\\\\n- Sound human, casual, knowledgeable. Light humor ok. Usually 1-2 short sentences; up to ~160 chars if explaining something they asked.\\\\n`;\n\nconst msgs = [{ role: 'system', content: preamble + '\\\\n---\\\\n\\\\n' + (j.system_prompt || '') }];\nfor (const h of history) {\n  if (h && h.role && h.content && String(h.content).trim()) {\n    msgs.push({ role: h.role, content: String(h.content).trim() });\n  }\n}\nconst last = msgs[msgs.length - 1];\nif (!last || last.role !== 'user' || last.content !== j.message_body) {\n  msgs.push({ role: 'user', content: j.message_body });\n}\n\nconst maxTok = wellnessTopic ? 160 : 80;\nconst body = {\n  model: j.model || 'gpt-4.1-mini',\n  temperature: j.temperature || 0.6,\n  max_tokens: maxTok,\n  messages: msgs,\n};\n\nreturn [{ json: { ...j, openai_body: body, wellness_topic: wellnessTopic } }];\n"
+      },
+      "id": "a1000001-0001-4000-8000-00000000000f",
+      "name": "Build OpenAI Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        990,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openai_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1000001-0001-4000-8000-000000000009",
+      "name": "OpenAI - Alex Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI API Bearer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const guard = $('Guardrails + Route').first().json;\nconst fallback = \"Sure, I can help ya — what's going on?\";\nlet reply = guard.reply_text || '';\nlet conversation_mode = guard.route === 'handoff' ? 'human_escalation' : 'general_cs';\nlet language = 'en';\nlet needs_handoff = guard.route === 'handoff';\nif (guard.route === 'ai') {\n  const oai = $input.first().json;\n  const err = oai.error?.message || oai.message;\n  if (err && !oai.choices) {\n    reply = fallback;\n  } else {\n    reply = oai.choices?.[0]?.message?.content?.trim() || fallback;\n  }\n  const modeMatch = reply.match(/\\|\\|MODE:([a-z_]+)\\|\\|/i);\n  const langMatch = reply.match(/\\|\\|LANG:([a-z-]+)\\|\\|/i);\n  if (modeMatch) conversation_mode = modeMatch[1];\n  if (langMatch) language = langMatch[1];\n  if (conversation_mode === 'human_escalation' || conversation_mode === 'sales_purchase' || conversation_mode === 'review_recovery') needs_handoff = true;\n  reply = reply.replace(/\\|\\|MODE:[a-z_]+\\|\\|/gi, '').replace(/\\|\\|LANG:[a-z-]+\\|\\|/gi, '').trim();\n  if (reply.length > 480) reply = reply.slice(0, 477) + '...';\n}\nreturn [{ json: { ...guard, reply_text: reply, conversation_mode, language, needs_handoff } }];"
+      },
+      "id": "a1000001-0001-4000-8000-00000000000a",
+      "name": "Prepare Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/conversations/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(Object.assign({ type: 'SMS', contactId: $json.ghl_contact_id, message: $json.reply_text }, ($json.location_id && $json.location_id !== 'YOUR_GHL_LOCATION_ID') ? { locationId: $json.location_id } : {})) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1000001-0001-4000-8000-00000000000b",
+      "name": "Send SMS via GHL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_GHL_CREDENTIAL_ID",
+          "name": "GoHighLevel API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://emrqlssbrntnvvdwwojs.supabase.co/rest/v1/bot_messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ client_id: $json.config.client_id, contact_id: '00000000-0000-0000-0000-000000000000', interaction_id: '00000000-0000-0000-0000-000000000000', direction: 'inbound', body: $json.message_body, provider: 'ghl', raw_payload: { conversation_id: $json.ghl_conversation_id } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1000001-0001-4000-8000-00000000000c",
+      "name": "Save Inbound (optional)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase Service Role"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"route\": {{ JSON.stringify($('Prepare Reply').first().json.route) }} }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1000001-0001-4000-8000-00000000000d",
+      "name": "Respond to GHL",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://emrqlssbrntnvvdwwojs.supabase.co/rest/v1/rpc/alex_sms_complete",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_client_slug: $json.client_slug || 'volt-n-vent', p_ghl_contact_id: $json.ghl_contact_id, p_dedupe_key: $json.dedupe_key, p_inbound_body: $json.message_body, p_outbound_body: $json.reply_text, p_conversation_mode: $json.conversation_mode || 'general_cs', p_language: $json.language || 'en', p_needs_handoff: $json.needs_handoff || false, p_interaction_id: $json.interaction_id || null }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1000001-0001-4000-8000-000000000012",
+      "name": "Complete Session",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1660,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase Service Role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"skipped\": true, \"reason\": \"duplicate\" }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1000001-0001-4000-8000-000000000013",
+      "name": "Respond Skip",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Volt N' Vent — Alex SMS v2\n\nSession memory + dedupe via Supabase. Poller checks every 30s.",
+        "height": 220,
+        "width": 380
+      },
+      "id": "a1000001-0001-4000-8000-00000000000e",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * n8n Code node: GHL CRM Sync\n * Adds contact note + creates/updates Marketing Pipeline opportunity stage.\n * Requires GHL httpHeaderAuth credential on this node.\n */\nconst item = $input.first().json;\nconst configRow = item.config || $('Load Alex Config').first().json;\nconst config = Array.isArray(configRow) ? configRow[0] : configRow;\nconst meta = typeof config?.metadata === 'string' ? JSON.parse(config.metadata) : (config?.metadata || {});\nconst crm = meta.ghl_crm_sync || {};\n\nif (!crm.enabled || !crm.pipeline_id) {\n  return [{ json: { ...item, crm_sync: { skipped: true, reason: 'crm_not_configured' } } }];\n}\n\nconst cred = await this.getCredentials('httpHeaderAuth');\nconst token = String(cred?.value || '').trim();\nconst headers = {\n  Authorization: token.toLowerCase().startsWith('bearer') ? token : `Bearer ${token}`,\n  Version: '2021-07-28',\n  Accept: 'application/json',\n  'Content-Type': 'application/json',\n};\n\nconst locationId = crm.location_id || item.location_id || config.ghl_location_id;\nconst contactId = item.ghl_contact_id;\nif (!contactId || !locationId) {\n  return [{ json: { ...item, crm_sync: { skipped: true, reason: 'missing_contact_or_location' } } }];\n}\n\nconst userText = String(item.message_body || '').toLowerCase();\nconst replyText = String(item.reply_text || '').toLowerCase();\nconst mode = item.conversation_mode || 'general_cs';\nconst route = item.route || 'ai';\nconst combined = `${userText} ${replyText}`;\n\nfunction pickDispositionKey() {\n  if (route === 'stop') return 'opt_out';\n  if (/not interested|no thanks|wrong number|leave me alone|stop texting|dont text/.test(userText)) return 'not_interested';\n  if (item.needs_handoff || mode === 'human_escalation' || route === 'handoff') return 'human_handoff';\n  if (mode === 'sales_purchase') return 'sales_handoff';\n  if (mode === 'emergency_dispatch' || /not cooling|no ac|no heat|emergency|asap|burning smell/.test(userText)) return 'urgent_service';\n  if (/book|schedule|appointment|tomorrow|monday|tuesday|wednesday|thursday|friday|8-12|12-4|morning|afternoon/.test(combined)) return 'appointment_set';\n  if (mode === 'wellness_drip' || /wellness|29\\.95|\\$29|\\$30/.test(combined)) return 'wellness_interested';\n  if (Number(item.prior_assistant_count || 0) === 0 && route === 'ai') return 'new_contact';\n  return 'engaged';\n}\n\nconst dispositionKey = pickDispositionKey();\nconst disposition = crm.dispositions?.[dispositionKey] || { label: dispositionKey };\nconst stageId = crm.stage_ids?.[dispositionKey] || crm.stage_ids?.engaged || crm.stage_ids?.new_contact || null;\n\nconst stamp = new Date().toISOString().replace('T', ' ').slice(0, 16);\nconst noteBody = [\n  `[${crm.note_prefix || 'Alex SMS'}] ${stamp}`,\n  `Disposition: ${disposition.label || dispositionKey}`,\n  `Mode: ${mode}${item.needs_handoff ? ' | Handoff: yes' : ''}`,\n  `Customer: ${String(item.message_body || '').slice(0, 500)}`,\n  `Alex: ${String(item.reply_text || '').slice(0, 500)}`,\n].join('\\n');\n\nconst results = { disposition_key: dispositionKey, disposition_label: disposition.label, stage_id: stageId, note: null, opportunity: null, errors: [] };\n\nconst http = this.helpers.httpRequest.bind(this);\n\ntry {\n  const noteRes = await http({\n    method: 'POST',\n    url: `https://services.leadconnectorhq.com/contacts/${contactId}/notes`,\n    headers,\n    body: { body: noteBody },\n    json: true,\n  });\n  results.note = noteRes?.note?.id || 'created';\n} catch (e) {\n  results.errors.push({ step: 'note', message: String(e.message || e) });\n}\n\nif (stageId) {\n  try {\n    const search = await http({\n      method: 'GET',\n      url: 'https://services.leadconnectorhq.com/opportunities/search',\n      headers,\n      qs: {\n        location_id: locationId,\n        contact_id: contactId,\n        pipeline_id: crm.pipeline_id,\n        limit: 1,\n        status: 'all',\n      },\n      json: true,\n    });\n    const existing = (search?.opportunities || [])[0];\n    const oppName = `SMS — ${disposition.label || dispositionKey}`;\n\n    if (existing?.id) {\n      await http({\n        method: 'PUT',\n        url: `https://services.leadconnectorhq.com/opportunities/${existing.id}`,\n        headers,\n        body: {\n          pipelineId: crm.pipeline_id,\n          pipelineStageId: stageId,\n          name: oppName,\n        },\n        json: true,\n      });\n      results.opportunity = { action: 'updated', id: existing.id, stageId };\n    } else {\n      const created = await http({\n        method: 'POST',\n        url: 'https://services.leadconnectorhq.com/opportunities/',\n        headers,\n        body: {\n          pipelineId: crm.pipeline_id,\n          locationId,\n          name: oppName,\n          pipelineStageId: stageId,\n          status: 'open',\n          contactId,\n        },\n        json: true,\n      });\n      results.opportunity = { action: 'created', id: created?.opportunity?.id || created?.id, stageId };\n    }\n  } catch (e) {\n    results.errors.push({ step: 'opportunity', message: String(e.message || e) });\n  }\n} else {\n  results.errors.push({ step: 'opportunity', message: 'no_stage_id_mapped — run setup-ghl-marketing-pipeline.mjs' });\n}\n\nreturn [{ json: { ...item, crm_sync: results } }];\n"
+      },
+      "id": "a1000001-0001-4000-8000-0000000020",
+      "name": "GHL CRM Sync",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_GHL_CREDENTIAL_ID",
+          "name": "VNV GoHighLevel"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook GHL SMS": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Load Alex Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Alex Config": {
+      "main": [
+        [
+          {
+            "node": "Start Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Session": {
+      "main": [
+        [
+          {
+            "node": "Already Processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Processed?": {
+      "main": [
+        [
+          {
+            "node": "Respond Skip",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guardrails + Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardrails + Route": {
+      "main": [
+        [
+          {
+            "node": "Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build OpenAI Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build OpenAI Request": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Alex Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Alex Reply": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reply": {
+      "main": [
+        [
+          {
+            "node": "Send SMS via GHL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS via GHL": {
+      "main": [
+        [
+          {
+            "node": "GHL CRM Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete Session": {
+      "main": [
+        [
+          {
+            "node": "Respond to GHL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GHL CRM Sync": {
+      "main": [
+        [
+          {
+            "node": "Complete Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "staticData": null,
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false
+}

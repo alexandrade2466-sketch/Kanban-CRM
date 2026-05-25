@@ -1,0 +1,61 @@
+/**
+ * Volt N' Vent — readable text on light/tan cards (prices were yellow-on-tan).
+ * Gold/yellow text belongs on navy backgrounds; navy text on tan cards.
+ */
+
+/* Navy highlight tile (Starting Price, featured package, etc.) */
+.vnv-stat-card {
+  background: linear-gradient(160deg, #0f2844 0%, #153a5c 100%);
+  border: 2px solid rgba(247, 198, 0, 0.45);
+  color: #edbe87;
+}
+.vnv-stat-card .vnv-stat-label {
+  color: rgba(237, 190, 135, 0.85);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.vnv-stat-card .vnv-stat-price {
+  color: #f7c600;
+  font-family: Fredoka, system-ui, sans-serif;
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
+  line-height: 1.2;
+}
+.vnv-stat-card h3 {
+  color: #f7c600;
+}
+
+/* Package option card — navy price header strip */
+.vnv-package-head {
+  background: linear-gradient(160deg, #0f2844 0%, #153a5c 100%);
+  padding: 1.5rem;
+  border-bottom: 2px solid rgba(21, 58, 92, 0.15);
+}
+.vnv-package-head p.text-xs {
+  color: rgba(237, 190, 135, 0.8) !important;
+}
+.vnv-package-head .font-display {
+  color: #f7c600 !important;
+}
+
+/* Tan stat tiles (non-featured) — navy text */
+.vnv-tan-stat {
+  background-color: rgba(242, 212, 170, 0.65);
+  border: 2px solid rgba(21, 58, 92, 0.12);
+}
+.vnv-tan-stat .vnv-stat-price,
+.vnv-tan-stat .font-display {
+  color: #153a5c !important;
+}
+
+/* Safety net: large gold prices on paper-lift cards → navy */
+.bg-paper-lift\/50 .font-display.text-4xl.font-bold.text-gold:not(.vnv-package-head *),
+.bg-paper-lift\/50 .font-display.text-3xl.font-bold.text-gold:not(.vnv-package-head *),
+.bg-paper-lift\/80 .font-display.text-3xl.font-bold.text-gold,
+.border-gold.bg-paper-lift\/50 .font-display.text-5xl.font-bold.text-gold,
+.border-gold.bg-paper-lift\/80 .font-display.text-3xl.font-bold.text-gold {
+  color: #153a5c !important;
+}
