@@ -1,0 +1,37 @@
+# Triggers one summer campaign send attempt every 10 minutes.
+# Replaces the DO n8n poller — no droplet load, nothing to click in n8n.
+#
+# Before June 17: API returns campaign_not_launched (no Twilio cost).
+# After launch_at: sends proceed automatically via TradeFlow + Twilio.
+#
+# Optional repo secret TRADEFLOW_CRON_SECRET if Vercel has CRON_SECRET set.
+
+name: VNV Campaign Outbound
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: vnv-campaign-outbound
+  cancel-in-progress: false
+
+jobs:
+  trigger-send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping TradeFlow outbound
+        env:
+          OUTBOUND_URL: https://tradeflow-ivory-ten.vercel.app/api/campaign/outbound
+          CRON_SECRET: ${{ secrets.TRADEFLOW_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          args=(-fsS -X GET "$OUTBOUND_URL")
+          if [ -n "${CRON_SECRET:-}" ]; then
+            args+=(-H "Authorization: Bearer $CRON_SECRET")
+          fi
+          curl "${args[@]}" -o /tmp/outbound.json
+          echo "Response:"
+          cat /tmp/outbound.json
